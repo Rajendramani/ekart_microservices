@@ -1,0 +1,31 @@
+Order Service:
+==============
+Get Order details
+GET http://localhost:9090/order/1
+
+Place Order
+POST http://localhost:9090/order/placeOrder
+
+Payment Details:
+================
+Get payment details
+GET http://localhost:9090/payment/order/2
+
+Do payment
+POST http://localhost:9090/payment
+
+Product Service:
+================
+Add Product
+POST http://localhost:9090/product
+
+Get Product
+GET http://localhost:9090/product/3
+
+Zipkin Docker:
+==============
+docker run -d -p 9411:9411 openzipkin/zipkin
+
+Redis Docker:
+=============
+docker run --name latest-redis -d -p6379:6379 redis
