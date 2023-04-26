@@ -1,0 +1,120 @@
+version: '3'
+services:
+  mysqldb:
+    image: mysql:8.0
+    command: --default-authentication-plugin=mysql_native_password
+    container_name: mysqldb
+    volumes:
+      - ./db_dump:/var/lib/mysql
+      - ./create_db:/docker-entrypoint-initdb.d
+    ports:
+      - 3307:3306
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=Mani@1489
+  zipkin:
+    image: openzipkin/zipkin
+    container_name: zipkin
+    ports:
+      - 9411:9411
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://host.docker.internal:9411"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - 6379:6379
+    extra_hosts:
+      - host.docker.internal:host-gateway
+  serviceregistry:
+    image: rajendramani/ekart_serviceregistry:0.0.1
+    container_name: serviceregistry
+    ports:
+      - 8761:8761
+    extra_hosts:
+      - host.docker.internal:host-gateway
+  configserver:
+    image: rajendramani/ekart_configserver:0.0.1
+    container_name: configserver
+    ports:
+      - 9296:9296
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    environment:
+      - EUREKA_SERVER_ADDRESS=http://serviceregistry:8761/eureka
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://configserver:9296/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      - serviceregistry
+  cloudgateway:
+    image: rajendramani/ekart_cloudgateway:0.0.1
+    container_name: cloudgateway
+    ports:
+      - 9090:9090
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    environment:
+      - EUREKA_SERVER_ADDRESS=http://serviceregistry:8761/eureka
+      - CONFIG_SERVER_URL=configserver
+      - ZIPKIN_SERVER_URL=zipkin
+    depends_on:
+      configserver:
+        condition: service_healthy
+  productservice:
+    image: rajendramani/ekart_productservice:0.0.1
+    container_name: productservice
+    ports:
+      - 8080:8080
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    restart: always
+    environment:
+      - EUREKA_SERVER_ADDRESS=http://serviceregistry:8761/eureka
+      - CONFIG_SERVER_URL=configserver
+      - DB_HOST=mysqldb
+      - ZIPKIN_SERVER_URL=zipkin
+    depends_on:
+      configserver:
+        condition: service_healthy
+  paymentservice:
+    image: rajendramani/ekart_paymentservice:0.0.1
+    container_name: paymentservice
+    ports:
+      - 8081:8081
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    restart: always
+    environment:
+      - EUREKA_SERVER_ADDRESS=http://serviceregistry:8761/eureka
+      - CONFIG_SERVER_URL=configserver
+      - DB_HOST=mysqldb
+      - ZIPKIN_SERVER_URL=zipkin
+    depends_on:
+      configserver:
+        condition: service_healthy
+  orderservice:
+    image: rajendramani/ekart_orderservice:0.0.1
+    container_name: orderservice
+    ports:
+      - 8082:8082
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    restart: always
+    environment:
+      - EUREKA_SERVER_ADDRESS=http://serviceregistry:8761/eureka
+      - CONFIG_SERVER_URL=configserver
+      - DB_HOST=mysqldb
+      - ZIPKIN_SERVER_URL=zipkin
+    depends_on:
+      configserver:
+        condition: service_healthy

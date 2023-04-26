@@ -1,0 +1,60 @@
+version: '3'
+services:
+  mysqldb:
+    image: mysql:8.0
+    command: --init-file /data/application/init.sql
+    container_name: mysqldb
+    volumes:
+      - /home/rajendramani/Documents/workspace/gitlab/mysqldb_persist:/var/lib/mysql
+      - /home/rajendramani/Documents/workspace/gitlab/init/01_databases.sql:/data/application/init.sql
+    ports:
+      - 3307:3306
+    restart: always
+    environment:
+      - MYSQL_ROOT_PASSWORD=root
+  zipkin:
+    image: openzipkin/zipkin
+    container_name: zipkin
+    ports:
+      - 9411:9411
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://host.docker.internal:9411"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+  redis:
+    image: redis:latest
+    container_name: redis
+    ports:
+      - 6379:6379
+  serviceregistry:
+    image: rajendramani/ekart_serviceregistry:0.0.1
+    container_name: serviceregistry
+    ports:
+      - 8761:8761
+  configserver:
+    image: rajendramani/ekart_configserver:0.0.1
+    container_name: configserver
+    ports:
+      - 9296:9296
+    environment:
+      - EUREKA_SERVER_ADDRESS=http://serviceregistry:8761/eureka
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://configserver:9296/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    depends_on:
+      - serviceregistry
+  cloudgateway:
+    image: rajendramani/ekart_cloudgateway:0.0.1
+    container_name: cloudgateway
+    ports:
+      - 9090:9090
+    environment:
+      - EUREKA_SERVER_ADDRESS=http://serviceregistry:8761/eureka
+      - CONFIG_SERVER_URL=configserver
+      - ZIPKIN_SERVER_URL=host.docker.internal
+    depends_on:
+      configserver:
+        condition: service_healthy
